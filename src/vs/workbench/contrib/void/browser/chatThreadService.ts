@@ -39,6 +39,7 @@ import { IDirectoryStrService } from '../common/directoryStrService.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { IMCPService } from '../common/mcpService.js';
 import { RawMCPToolCall } from '../common/mcpServiceTypes.js';
+import { ImageData } from '../react/src/util/imageUpload.js';
 
 
 // related to retrying when LLM message has error
@@ -280,7 +281,7 @@ export interface IChatThreadService {
 	editUserMessageAndStreamResponse({ userMessage, messageIdx, threadId }: { userMessage: string, messageIdx: number, threadId: string }): Promise<void>;
 
 	// call to add a message
-	addUserMessageAndStreamResponse({ userMessage, threadId }: { userMessage: string, threadId: string }): Promise<void>;
+	addUserMessageAndStreamResponse({ userMessage, threadId, images }: { userMessage: string, threadId: string, images?: ImageData[] }): Promise<void>;
 
 	// approve/reject
 	approveLatestToolRequest(threadId: string): void;
@@ -734,12 +735,13 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 		modelSelection,
 		modelSelectionOptions,
 		callThisToolFirst,
+		images
 	}: {
 		threadId: string,
 		modelSelection: ModelSelection | null,
 		modelSelectionOptions: ModelSelectionOptions | undefined,
-
-		callThisToolFirst?: ToolMessage<ToolName> & { type: 'tool_request' }
+		callThisToolFirst?: ToolMessage<ToolName> & { type: 'tool_request' },
+		images?: ImageData[]
 	}) {
 
 
@@ -777,8 +779,21 @@ class ChatThreadService extends Disposable implements IChatThreadService {
 			this._setStreamState(threadId, { isRunning: 'idle', interrupt: idleInterruptor })
 
 			const chatMessages = this.state.allThreads[threadId]?.messages ?? []
+
+			// If images are present, add them to the last user message
+			let messagesWithImages = chatMessages;
+			if (images && images.length > 0 && chatMessages.length > 0) {
+				const lastMsg = chatMessages[chatMessages.length - 1];
+				if (lastMsg.role === 'user') {
+					const textContent = typeof lastMsg.content === 'string' ? [{ type: 'text', text: lastMsg.content }] : lastMsg.content;
+					const imageContent = images.map(img => ({ type: 'image', source: { type: 'base64', media_type: img.type, data: img.dataUrl.split(',')[1] } }));
+					lastMsg.content = [...(textContent || []), ...imageContent];
+					messagesWithImages = [...chatMessages.slice(0, -1), lastMsg];
+				}
+			}
+
 			const { messages, separateSystemMessage } = await this._convertToLLMMessagesService.prepareLLMChatMessages({
-				chatMessages,
+				chatMessages: messagesWithImages,
 				modelSelection,
 				chatMode
 			})
@@ -1231,7 +1246,7 @@ We only need to do it for files that were edited since `from`, ie files between 
 	}
 
 
-	private async _addUserMessageAndStreamResponse({ userMessage, _chatSelections, threadId }: { userMessage: string, _chatSelections?: StagingSelectionItem[], threadId: string }) {
+	private async _addUserMessageAndStreamResponse({ userMessage, _chatSelections, threadId, images }: { userMessage: string, _chatSelections?: StagingSelectionItem[], threadId: string, images?: ImageData[] }) {
 		const thread = this.state.allThreads[threadId]
 		if (!thread) return // should never happen
 
@@ -1257,7 +1272,7 @@ We only need to do it for files that were edited since `from`, ie files between 
 		this._setThreadState(threadId, { currCheckpointIdx: null }) // no longer at a checkpoint because started streaming
 
 		this._wrapRunAgentToNotify(
-			this._runChatAgent({ threadId, ...this._currentModelSelectionProps(), }),
+			this._runChatAgent({ threadId, ...this._currentModelSelectionProps(), images }),
 			threadId,
 		)
 

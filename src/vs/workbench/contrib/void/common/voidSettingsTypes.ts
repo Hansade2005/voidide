@@ -33,6 +33,7 @@ export type VoidStatefulModelInfo = { // <-- STATEFUL
 	modelName: string,
 	type: 'default' | 'autodetected' | 'custom';
 	isHidden: boolean, // whether or not the user is hiding it (switched off)
+	supportsVision?: boolean; // user-editable for custom models, ignored for built-in vision models
 }
 
 
@@ -106,6 +107,9 @@ export const displayInfoOfProviderName = (providerName: ProviderName): DisplayIn
 	else if (providerName === 'awsBedrock') {
 		return { title: 'AWS Bedrock', }
 	}
+	else if (providerName === 'codestral') {
+		return { title: 'Codestral', }
+	}
 
 	throw new Error(`descOfProviderName: Unknown provider name: "${providerName}"`)
 }
@@ -128,6 +132,7 @@ export const subTextMdOfProviderName = (providerName: ProviderName): string => {
 	if (providerName === 'vLLM') return 'Read more about custom [Endpoints here](https://docs.vllm.ai/en/latest/getting_started/quickstart.html#openai-compatible-server).'
 	if (providerName === 'lmStudio') return 'Read more about custom [Endpoints here](https://lmstudio.ai/docs/app/api/endpoints/openai).'
 	if (providerName === 'liteLLM') return 'Read more about endpoints [here](https://docs.litellm.ai/docs/providers/openai_compatible).'
+	if (providerName === 'codestral') return 'Get your [API Key here](https://console.mistral.ai/api-keys). Codestral is Mistral’s code-specialized model.';
 
 	throw new Error(`subTextMdOfProviderName: Unknown provider name: "${providerName}"`)
 }

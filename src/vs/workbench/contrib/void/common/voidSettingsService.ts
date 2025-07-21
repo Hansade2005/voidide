@@ -79,6 +79,8 @@ export interface IVoidSettingsService {
 	addMCPUserStateOfNames(userStateOfName: MCPUserStateOfName): Promise<void>;
 	removeMCPUserStateOfNames(serverNames: string[]): Promise<void>;
 	setMCPServerState(serverName: string, state: MCPUserState): Promise<void>;
+	setModelVisionSupport(providerName: ProviderName, modelName: string, supportsVision: boolean): void;
+	renameModel(providerName: ProviderName, oldModelName: string, newModelName: string): void;
 }
 
 
@@ -289,7 +291,7 @@ class VoidSettingsService extends Disposable implements IVoidSettingsService {
 			}
 			// add disableSystemMessage feature
 			if (readS.globalSettings.disableSystemMessage === undefined) readS.globalSettings.disableSystemMessage = false;
-			
+
 			// add autoAcceptLLMChanges feature
 			if (readS.globalSettings.autoAcceptLLMChanges === undefined) readS.globalSettings.autoAcceptLLMChanges = false;
 		}
@@ -607,6 +609,26 @@ class VoidSettingsService extends Disposable implements IVoidSettingsService {
 		}
 		await this._setMCPUserStateOfName(newMCPServerStates)
 		this._metricsService.capture('Update MCP Server State', { serverName, state });
+	}
+
+	setModelVisionSupport(providerName: ProviderName, modelName: string, supportsVision: boolean) {
+		const models = this.state.settingsOfProvider[providerName].models;
+		const idx = models.findIndex(m => m.modelName === modelName);
+		if (idx !== -1) {
+			models[idx] = { ...models[idx], supportsVision };
+			this._onDidChangeState.fire();
+			this._storeState();
+		}
+	}
+
+	renameModel(providerName: ProviderName, oldModelName: string, newModelName: string) {
+		const models = this.state.settingsOfProvider[providerName].models;
+		const idx = models.findIndex(m => m.modelName === oldModelName);
+		if (idx !== -1) {
+			models[idx] = { ...models[idx], modelName: newModelName };
+			this._onDidChangeState.fire();
+			this._storeState();
+		}
 	}
 
 }

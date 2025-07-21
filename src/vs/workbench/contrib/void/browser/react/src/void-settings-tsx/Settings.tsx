@@ -17,7 +17,7 @@ import { os } from '../../../../common/helpers/systemInfo.js'
 import { IconLoading } from '../sidebar-tsx/SidebarChat.js'
 import { ToolApprovalType, toolApprovalTypes } from '../../../../common/toolsServiceTypes.js'
 import Severity from '../../../../../../../base/common/severity.js'
-import { getModelCapabilities, modelOverrideKeys, ModelOverrides } from '../../../../common/modelCapabilities.js';
+import { getModelCapabilities, modelOverrideKeys, ModelOverrides, isVisionSupported } from '../../../../common/modelCapabilities.js';
 import { TransferEditorType, TransferFilesInfo } from '../../../extensionTransferTypes.js';
 import { MCPServer } from '../../../../common/mcpServiceTypes.js';
 import { useMCPServiceState } from '../util/services.js';
@@ -437,7 +437,7 @@ export const ModelDump = ({ filteredProviders }: { filteredProviders?: ProviderN
 
 	return <div className=''>
 		{modelDump.map((m, i) => {
-			const { isHidden, type, modelName, providerName, providerEnabled } = m
+			const { isHidden, type, modelName, providerName, providerEnabled, supportsVision } = m;
 
 			const isNewProviderName = (i > 0 ? modelDump[i - 1] : undefined)?.providerName !== providerName
 
@@ -459,6 +459,8 @@ export const ModelDump = ({ filteredProviders }: { filteredProviders?: ProviderN
 					<Asterisk size={14} className="inline-block align-text-top brightness-115 stroke-[2] text-[#0e70c0]" data-tooltip-id='void-tooltip' data-tooltip-place='right' data-tooltip-content='Custom model' />
 					: undefined
 
+			const isBuiltInVision = isVisionSupported(modelName, providerName);
+
 			const hasOverrides = !!settingsState.overridesOfModel?.[providerName]?.[modelName]
 
 			return <div key={`${modelName}${providerName}`}
@@ -468,7 +470,16 @@ export const ModelDump = ({ filteredProviders }: { filteredProviders?: ProviderN
 				{/* left part is width:full */}
 				<div className={`flex flex-grow items-center gap-4`}>
 					<span className='w-full max-w-32'>{isNewProviderName ? providerTitle : ''}</span>
-					<span className='w-fit max-w-[400px] truncate'>{modelName}</span>
+					{/* Editable model name for custom models */}
+					{type === 'custom' ? (
+						<input
+							className="w-fit max-w-[400px] truncate bg-transparent border-b border-void-border-2 focus:border-void-border-1 outline-none"
+							value={modelName}
+							onChange={e => settingsStateService.renameModel(providerName, modelName, e.target.value)}
+						/>
+					) : (
+						<span className='w-fit max-w-[400px] truncate'>{modelName}</span>
+					)}
 				</div>
 
 				{/* right part is anything that fits */}
@@ -492,6 +503,16 @@ export const ModelDump = ({ filteredProviders }: { filteredProviders?: ProviderN
 					{/* Blue star */}
 					{detailAboutModel}
 
+					{/* Vision support toggle */}
+					<VoidSwitch
+						value={isBuiltInVision || !!supportsVision}
+						onChange={v => settingsStateService.setModelVisionSupport(providerName, modelName, v)}
+						disabled={isBuiltInVision || disabled}
+						size='sm'
+						data-tooltip-id='void-tooltip'
+						data-tooltip-place='right'
+						data-tooltip-content={isBuiltInVision ? 'Built-in vision model (cannot be changed)' : 'Toggle vision support'}
+					/>
 
 					{/* Switch */}
 					<VoidSwitch

@@ -14,6 +14,7 @@ import { URI } from '../../../../../../../base/common/uri.js';
 import { IDisposable } from '../../../../../../../base/common/lifecycle.js';
 import { ErrorDisplay } from './ErrorDisplay.js';
 import { BlockCode, TextAreaFns, VoidCustomDropdownBox, VoidInputBox2, VoidSlider, VoidSwitch, VoidDiffEditor } from '../util/inputs.js';
+import { ImageUploadButton, ImageUploadArea, ImageData } from '../util/imageUpload.js';
 import { ModelDropdown, } from '../void-settings-tsx/ModelDropdown.js';
 import { PastThreadsList } from './SidebarThreadSelector.js';
 import { VOID_CTRL_L_ACTION_ID } from '../../../actionIDs.js';
@@ -21,7 +22,7 @@ import { VOID_OPEN_SETTINGS_ACTION_ID } from '../../../voidSettingsPane.js';
 import { ChatMode, displayInfoOfProviderName, FeatureName, isFeatureNameDisabled } from '../../../../../../../workbench/contrib/void/common/voidSettingsTypes.js';
 import { ICommandService } from '../../../../../../../platform/commands/common/commands.js';
 import { WarningBox } from '../void-settings-tsx/WarningBox.js';
-import { getModelCapabilities, getIsReasoningEnabledState } from '../../../../common/modelCapabilities.js';
+import { getModelCapabilities, getIsReasoningEnabledState, isVisionSupported } from '../../../../common/modelCapabilities.js';
 import { AlertTriangle, File, Ban, Check, ChevronRight, Dot, FileIcon, Pencil, Undo, Undo2, X, Flag, Copy as CopyIcon, Info, CirclePlus, Ellipsis, CircleEllipsis, Folder, ALargeSmall, TypeOutline, Text } from 'lucide-react';
 import { ChatMessage, CheckpointEntry, StagingSelectionItem, ToolMessage } from '../../../../common/chatThreadServiceTypes.js';
 import { approvalTypeOfBuiltinToolName, BuiltinToolCallParams, BuiltinToolName, ToolName, LintErrorItem, ToolApprovalType, toolApprovalTypes } from '../../../../common/toolsServiceTypes.js';
@@ -317,6 +318,13 @@ interface VoidChatAreaProps {
 	onClose?: () => void;
 
 	featureName: FeatureName;
+
+	// Image upload functionality
+	images?: ImageData[];
+	onImagesChange?: (images: ImageData[]) => void;
+	showImageUpload?: boolean;
+	visionSupported?: boolean;
+	showVisionWarning?: boolean;
 }
 
 export const VoidChatArea: React.FC<VoidChatAreaProps> = ({
@@ -336,6 +344,11 @@ export const VoidChatArea: React.FC<VoidChatAreaProps> = ({
 	setSelections,
 	featureName,
 	loadingIcon,
+	images,
+	onImagesChange,
+	showImageUpload,
+	visionSupported,
+	showVisionWarning,
 }) => {
 	return (
 		<div
@@ -380,6 +393,20 @@ export const VoidChatArea: React.FC<VoidChatAreaProps> = ({
 				)}
 			</div>
 
+			{/* Image upload area */}
+			{showImageUpload && images && onImagesChange && (
+				<div className="mt-2">
+					<ImageUploadArea
+						images={images}
+						onImagesChange={onImagesChange}
+						onImageSelect={(newImages) => {
+							onImagesChange([...images, ...newImages]);
+						}}
+						disabled={isDisabled}
+					/>
+				</div>
+			)}
+
 			{/* Bottom row */}
 			<div className='flex flex-row justify-between items-end gap-1'>
 				{showModelDropdown && (
@@ -387,6 +414,17 @@ export const VoidChatArea: React.FC<VoidChatAreaProps> = ({
 						<ReasoningOptionSlider featureName={featureName} />
 
 						<div className='flex items-center flex-wrap gap-x-2 gap-y-1 text-nowrap '>
+							{/* Image upload button - left of model selector */}
+							{showImageUpload && (
+								<ImageUploadButton
+									onImageSelect={(newImages) => {
+										if (images && onImagesChange) {
+											onImagesChange([...images, ...newImages]);
+										}
+									}}
+									disabled={isDisabled}
+								/>
+							)}
 							{featureName === 'Chat' && <ChatModeDropdown className='text-xs text-void-fg-3 bg-void-bg-1 border border-void-border-2 rounded py-0.5 px-1' />}
 							<ModelDropdown featureName={featureName} className='text-xs text-void-fg-3 bg-void-bg-1 rounded' />
 						</div>
@@ -408,6 +446,11 @@ export const VoidChatArea: React.FC<VoidChatAreaProps> = ({
 				</div>
 
 			</div>
+			{showVisionWarning && (
+				<div className="text-xs text-red-500 mt-1 mb-2">
+					This model does not support image input. Only image metadata will be sent.
+				</div>
+			)}
 		</div>
 	);
 };
@@ -1148,6 +1191,9 @@ const UserMessageComponent = ({ chatMessage, messageIdx, isCheckpointGhost, curr
 			showProspectiveSelections={false}
 			selections={stagingSelections}
 			setSelections={setStagingSelections}
+			images={images}
+			onImagesChange={onImagesChange}
+			showImageUpload={showImageUpload}
 		>
 			<VoidInputBox2
 				enableAtToMention
@@ -2885,6 +2931,7 @@ export const SidebarChat = () => {
 	const accessor = useAccessor()
 	const commandService = accessor.get('ICommandService')
 	const chatThreadsService = accessor.get('IChatThreadService')
+	const keybindingService = accessor.get('IKeybindingService')
 
 	const settingsState = useSettingsState()
 	// ----- HIGHER STATE -----
@@ -2897,6 +2944,9 @@ export const SidebarChat = () => {
 
 	const selections = currentThread.state.stagingSelections
 	const setSelections = (s: StagingSelectionItem[]) => { chatThreadsService.setCurrentThreadState({ stagingSelections: s }) }
+
+	// Image upload state
+	const [images, setImages] = useState<ImageData[]>([]);
 
 	// stream state
 	const currThreadStreamState = useChatThreadsStreamState(chatThreadsState.currentThreadId)
@@ -2915,36 +2965,43 @@ export const SidebarChat = () => {
 
 	const isDisabled = instructionsAreEmpty || !!isFeatureNameDisabled('Chat', settingsState)
 
-	const sidebarRef = useRef<HTMLDivElement>(null)
-	const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-	const onSubmit = useCallback(async (_forceSubmit?: string) => {
-
-		if (isDisabled && !_forceSubmit) return
+	const onSubmit = async () => {
+		if (isDisabled) return
 		if (isRunning) return
+		textAreaFnsRef.current?.disable()
 
-		const threadId = chatThreadsService.state.currentThreadId
+		const userMessage = textAreaRef.current?.value ?? ''
+		if (!userMessage.trim()) return
 
-		// send message to LLM
-		const userMessage = _forceSubmit || textAreaRef.current?.value || ''
-
-		try {
-			await chatThreadsService.addUserMessageAndStreamResponse({ userMessage, threadId })
-		} catch (e) {
-			console.error('Error while sending message in chat:', e)
+		let imagesToSend = images;
+		if (!visionSupported && images.length > 0) {
+			imagesToSend = images.map(img => ({
+				id: img.id,
+				file: img.file,
+				dataUrl: '',
+				name: img.name,
+				size: img.size,
+				type: img.type,
+				metaSummary: `User attached image: ${img.name}, ${(img.size/1024).toFixed(1)}KB, type: ${img.type}`
+			}));
 		}
 
-		setSelections([]) // clear staging
+		// Clear images after sending
+		setImages([]);
+
+		await chatThreadsService.addUserMessageAndStreamResponse({ userMessage, threadId: currentThread.id, images: imagesToSend })
+		textAreaFnsRef.current?.enable()
 		textAreaFnsRef.current?.setValue('')
-		textAreaRef.current?.focus() // focus input after submit
-
-	}, [chatThreadsService, isDisabled, isRunning, textAreaRef, textAreaFnsRef, setSelections, settingsState])
-
-	const onAbort = async () => {
-		const threadId = currentThread.id
-		await chatThreadsService.abortRunning(threadId)
+		setInstructionsAreEmpty(true)
 	}
 
-	const keybindingString = accessor.get('IKeybindingService').lookupKeybinding(VOID_CTRL_L_ACTION_ID)?.getLabel()
+	const onAbort = async () => {
+		if (!isRunning) return
+		await chatThreadsService.abortRunning(currentThread.id)
+		textAreaFnsRef.current?.enable()
+	}
+
+	const keybindingString = keybindingService.lookupKeybinding(VOID_CTRL_L_ACTION_ID)?.getLabel()
 
 	const threadId = currentThread.id
 	const currCheckpointIdx = chatThreadsState.allThreads[threadId]?.state?.currCheckpointIdx ?? undefined  // if not exist, treat like checkpoint is last message (infinity)
@@ -3063,6 +3120,17 @@ export const SidebarChat = () => {
 		}
 	}, [onSubmit, onAbort, isRunning])
 
+	// Image upload state
+	const [images, setImages] = useState<ImageData[]>([]);
+
+	// Model selection state (assume you have a way to get the selected model)
+	const [selectedModel, setSelectedModel] = useState<string>('');
+	// You may need to wire this up to ModelDropdown's onChange
+
+	// Vision support check
+	const visionSupported = isVisionSupported(selectedModel);
+	const showVisionWarning = images.length > 0 && !visionSupported;
+
 	const inputChatArea = <VoidChatArea
 		featureName='Chat'
 		onSubmit={() => onSubmit()}
@@ -3074,6 +3142,11 @@ export const SidebarChat = () => {
 		selections={selections}
 		setSelections={setSelections}
 		onClickAnywhere={() => { textAreaRef.current?.focus() }}
+		images={images}
+		onImagesChange={setImages}
+		showImageUpload={true}
+		visionSupported={visionSupported}
+		showVisionWarning={showVisionWarning}
 	>
 		<VoidInputBox2
 			enableAtToMention

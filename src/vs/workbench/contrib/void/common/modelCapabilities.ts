@@ -3,7 +3,7 @@
  *  Licensed under the Apache License, Version 2.0. See LICENSE.txt for more information.
  *--------------------------------------------------------------------------------------*/
 
-import { FeatureName, ModelSelectionOptions, OverridesOfModel, ProviderName } from './voidSettingsTypes.js';
+import { FeatureName, ModelSelectionOptions, OverridesOfModel, ProviderName, SettingsOfProvider } from './voidSettingsTypes.js';
 
 
 
@@ -64,6 +64,9 @@ export const defaultProviderSettings = {
 		apiKey: '',
 		region: 'us-east-1', // add region setting
 		endpoint: '', // optionally allow overriding default
+	},
+	codestral: {
+		apiKey: '',
 	},
 
 } as const
@@ -153,6 +156,9 @@ export const defaultModelsOfProvider = {
 	microsoftAzure: [],
 	awsBedrock: [],
 	liteLLM: [],
+	codestral: [
+		'codestral-latest',
+	],
 
 
 } as const satisfies Record<ProviderName, string[]>
@@ -1474,6 +1480,21 @@ const modelSettingsOfProvider: { [providerName in ProviderName]: VoidStaticProvi
 	googleVertex: googleVertexSettings,
 	microsoftAzure: microsoftAzureSettings,
 	awsBedrock: awsBedrockSettings,
+	codestral: {
+		modelOptions: {
+			'codestral-latest': {
+				contextWindow: 131072,
+				reservedOutputTokenSpace: 8192,
+				cost: { input: 0.0, output: 0.0 }, // Update with real pricing if available
+				downloadable: false,
+				supportsFIM: true,
+				supportsSystemMessage: 'system-role',
+				reasoningCapabilities: false,
+			},
+		},
+		modelOptionsFallback: (modelName) => null,
+		providerReasoningIOSettings: {},
+	},
 } as const
 
 
@@ -1583,4 +1604,30 @@ export const getSendableReasoningInfo = (
 	}
 
 	return null
+}
+
+// List of models that support vision (image input)
+const VISION_MODELS = [
+	// Google Gemini
+	'gemini-pro', 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro',
+	// OpenAI
+	'gpt-4-vision', 'gpt-4o', 'gpt-4-turbo', 'gpt-4.1',
+	// Mistral Pixtral
+	'pixtral-12b-2409', 'pixtral-large-latest',
+	// Add more as needed
+];
+
+export function isVisionSupported(modelName: string, providerName?: string, settingsState?: { settingsOfProvider: SettingsOfProvider }): boolean {
+	const normalized = modelName.toLowerCase();
+	// 1. Built-in vision models (cannot be changed)
+	if (VISION_MODELS.some(m => normalized.includes(m.toLowerCase()))) return true;
+	// 2. User setting (if provided)
+	if (providerName && settingsState) {
+		const providerSettings = settingsState.settingsOfProvider?.[providerName];
+		const userModel = providerSettings?.models?.find(m => m.modelName === modelName);
+		if (userModel && typeof userModel.supportsVision === 'boolean') {
+			return userModel.supportsVision;
+		}
+	}
+	return false;
 }

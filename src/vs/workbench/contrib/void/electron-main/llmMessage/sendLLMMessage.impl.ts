@@ -16,7 +16,7 @@ import { GoogleAuth } from 'google-auth-library'
 
 import { AnthropicLLMChatMessage, GeminiLLMChatMessage, LLMChatMessage, LLMFIMMessage, ModelListParams, OllamaModelResponse, OnError, OnFinalMessage, OnText, RawToolCallObj, RawToolParamsObj } from '../../common/sendLLMMessageTypes.js';
 import { ChatMode, displayInfoOfProviderName, ModelSelectionOptions, OverridesOfModel, ProviderName, SettingsOfProvider } from '../../common/voidSettingsTypes.js';
-import { getSendableReasoningInfo, getModelCapabilities, getProviderCapabilities, defaultProviderSettings, getReservedOutputTokenSpace } from '../../common/modelCapabilities.js';
+import { getSendableReasoningInfo, getModelCapabilities, getProviderCapabilities, defaultProviderSettings, getReservedOutputTokenSpace, isVisionSupported } from '../../common/modelCapabilities.js';
 import { extractReasoningWrapper, extractXMLToolsWrapper } from './extractGrammar.js';
 import { availableTools, InternalToolInfo } from '../../common/prompt/prompts.js';
 import { generateUuid } from '../../../../../base/common/uuid.js';
@@ -166,6 +166,10 @@ const newOpenAICompatibleSDK = async ({ settingsOfProvider, providerName, includ
 	else if (providerName === 'mistral') {
 		const thisConfig = settingsOfProvider[providerName]
 		return new OpenAI({ baseURL: 'https://api.mistral.ai/v1', apiKey: thisConfig.apiKey, ...commonPayloadOpts })
+	}
+	else if (providerName === 'codestral') {
+		const thisConfig = settingsOfProvider[providerName]
+		return new OpenAI({ baseURL: 'https://codestral.mistral.ai/v1', apiKey: thisConfig.apiKey, ...commonPayloadOpts })
 	}
 
 	else throw new Error(`Void providerName was invalid: ${providerName}.`)
@@ -845,6 +849,32 @@ const sendGeminiChat = async ({
 };
 
 
+const sendCodestralFIM = async ({ messages: { prefix, suffix }, onFinalMessage, onError, settingsOfProvider, modelName: modelName_, _setAborter, providerName }: SendFIMParams_Internal) => {
+	const apiKey = settingsOfProvider.codestral.apiKey;
+	try {
+		const response = await fetch('https://codestral.mistral.ai/v1/fim/completions', {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${apiKey}`,
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				model: modelName_,
+				prompt: {
+					prefix,
+					suffix,
+					mode: 'middle'
+				}
+			})
+		});
+		const data = await response.json();
+		const completion = data.choices?.[0]?.text || '';
+		onFinalMessage({ fullText: completion, fullReasoning: '', anthropicReasoning: null });
+	} catch (error) {
+		onError({ message: error.message, fullError: error });
+	}
+};
+
 
 type CallFnOfProvider = {
 	[providerName in ProviderName]: {
@@ -937,6 +967,11 @@ export const sendLLMMessageToProviderImplementation = {
 		sendFIM: null,
 		list: null,
 	},
+	codestral: {
+		sendChat: (params) => _sendOpenAICompatibleChat(params),
+		sendFIM: sendCodestralFIM,
+		list: null,
+	},
 
 } satisfies CallFnOfProvider
 
@@ -953,7 +988,7 @@ codestral https://ollama.com/library/codestral/blobs/51707752a87c
 [SUFFIX]{{ .Suffix }}[PREFIX] {{ .Prompt }}
 
 deepseek-coder-v2 https://ollama.com/library/deepseek-coder-v2/blobs/22091531faf0
-<｜fim▁begin｜>{{ .Prompt }}<｜fim▁hole｜>{{ .Suffix }}<｜fim▁end｜>
+{{ .Prompt }}
 
 starcoder2 https://ollama.com/library/starcoder2/blobs/3b190e68fefe
 <file_sep>
@@ -965,3 +1000,25 @@ codegemma https://ollama.com/library/codegemma:2b/blobs/48d9a8140749
 <|fim_prefix|>{{ .Prompt }}<|fim_suffix|>{{ .Suffix }}<|fim_middle|>
 
 */
+
+// Utility to replace images with metadata if vision is not supported
+function filterImagesForVision(messages: LLMChatMessage[], modelName: string): LLMChatMessage[] {
+	if (isVisionSupported(modelName)) return messages;
+	return messages.map(msg => {
+		if (msg.role === 'user' && Array.isArray(msg.content)) {
+			return {
+				...msg,
+				content: msg.content.map(part => {
+					if (part.type === 'image' && part.source) {
+						return { type: 'text', text: part.metaSummary || 'User attached an image (vision not supported by this model).' };
+					}
+					return part;
+				})
+			};
+		}
+		return msg;
+	});
+}
+
+// Before sending to the LLM, filter images if needed
+// Example usage in sendChat: messages = filterImagesForVision(messages, modelName);

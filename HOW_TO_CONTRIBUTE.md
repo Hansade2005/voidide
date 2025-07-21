@@ -1,6 +1,6 @@
-# Contributing to Void
+# Contributing to Trio
 ### Welcome! 👋
-This is the official guide on how to contribute to Void. We want to make it as easy as possible to contribute, so if you have any questions or comments, reach out via email or discord!
+This is the official guide on how to contribute to Trio. We want to make it as easy as possible to contribute, so if you have any questions or comments, reach out via email or discord!
 
 There are a few ways to contribute:
 
@@ -12,16 +12,16 @@ There are a few ways to contribute:
 
 ### Codebase Guide
 
-We [highly recommend reading this](https://github.com/voideditor/void/blob/main/VOID_CODEBASE_GUIDE.md) guide that we put together on Void's sourcecode if you'd like to add new features.
+We [highly recommend reading this](https://github.com/voideditor/void/blob/main/VOID_CODEBASE_GUIDE.md) guide that we put together on Trio's sourcecode if you'd like to add new features.
 
 The repo is not as intimidating as it first seems if you read the guide!
 
-Most of Void's code lives in the folder `src/vs/workbench/contrib/void/`.
+Most of Trio's code lives in the folder `src/vs/workbench/contrib/void/`.
 
 
 
 
-## Building Void
+## Building Trio
 
 ### a. Mac - Build Prerequisites
 
@@ -51,16 +51,16 @@ First, run `npm install -g node-gyp`. Then:
 - SUSE (openSUSE, etc): `sudo zypper install patterns-devel-C-C++-devel_C_C++  krb5-devel libsecret-devel libxkbfile-devel libX11-devel`.
 - Others: see [How to Contribute](https://github.com/microsoft/vscode/wiki/How-to-Contribute).
 
-### d. Building Void from inside VSCode
+### d. Building Trio from inside VSCode
 
 1. `git clone https://github.com/voideditor/void` to clone the repo.
 2. `npm install` to install all dependencies.
-3. To build Void, open VSCode. Then:
+3. To build Trio, open VSCode. Then:
    - Windows: Press <kbd>Ctrl+Shift+B</kbd>.
    - Mac: Press <kbd>Cmd+Shift+B</kbd>.
    - Linux: Press <kbd>Ctrl+Shift+B</kbd>.
    - This step can take ~5 min. The build is done when you see two check marks (one of the items will continue spinning indefinitely - it compiles our React code).
-4. To run Void:
+4. To run Trio:
    - Windows: `./scripts/code.bat`.
    - Mac: `./scripts/code.sh`.
    - Linux: `./scripts/code.sh`.
@@ -71,9 +71,9 @@ First, run `npm install -g node-gyp`. Then:
 
 If you get any errors, scroll down for common fixes.
 
-#### Building Void from Terminal
+#### Building Trio from Terminal
 
-To build Void from the terminal instead of from inside VSCode, follow the steps above, but instead of pressing <kbd>Cmd+Shift+B</kbd>, run `npm run watch`. The build is done when you see something like this:
+To build Trio from the terminal instead of from inside VSCode, follow the steps above, but instead of pressing <kbd>Cmd+Shift+B</kbd>, run `npm run watch`. The build is done when you see something like this:
 
 ```
 [watch-extensions] [00:37:39] Finished compilation extensions with 0 errors after 19303 ms
@@ -88,7 +88,7 @@ To build Void from the terminal instead of from inside VSCode, follow the steps 
 - Make sure you followed the prerequisite steps above.
 - Make sure you have Node version `20.18.2` (the version in `.nvmrc`)!
     - You can do this easily without touching your base installation with [nvm](https://github.com/nvm-sh/nvm). Simply run `nvm install`, followed by `nvm use` and it will automatically install and use the version specified in `nvmrc`.
-- Make sure that the path to your Void folder does not have any spaces in it.
+- Make sure that the path to your Trio folder does not have any spaces in it.
 - If you get `"TypeError: Failed to fetch dynamically imported module"`, make sure all imports end with `.js`.
 - If you get an error with React, try running `NODE_OPTIONS="--max-old-space-size=8192" npm run buildreact`.
 - If you see missing styles, wait a few seconds and then reload.
@@ -100,7 +100,7 @@ To build Void from the terminal instead of from inside VSCode, follow the steps 
 
 ## Packaging
 
-We don't usually recommend packaging. Instead, you should probably just build. If you're sure you want to package Void into an executable app, make sure you've built first, then run one of the following commands. This will create a folder named `VSCode-darwin-arm64` or similar outside of the void/ repo (see below). Be patient - packaging can take ~25 minutes.
+We don't usually recommend packaging. Instead, you should probably just build. If you're sure you want to package Trio into an executable app, make sure you've built first, then run one of the following commands. This will create a folder named `VSCode-darwin-arm64` or similar outside of the trio/ repo (see below). Be patient - packaging can take ~25 minutes.
 
 
 ### Mac
@@ -118,15 +118,15 @@ We don't usually recommend packaging. Instead, you should probably just build. I
 
 ### Output
 
-This will generate a folder outside of `void/`:
+This will generate a folder outside of `trio/`:
 ```bash
 workspace/
-├── void/   # Your Void fork
+├── trio/   # Your Trio fork
 └── VSCode-darwin-arm64/ # Generated output
 ```
 
 ### Distributing
-Void's maintainers distribute Void on our website and in releases. Our build pipeline is a fork of VSCodium, and it works by running GitHub Actions which create the downloadables. The build repo with more instructions lives [here](https://github.com/voideditor/void-builder).
+Trio's maintainers distribute Trio on our website and in releases. Our build pipeline is a fork of VSCodium, and it works by running GitHub Actions which create the downloadables. The build repo with more instructions lives [here](https://github.com/voideditor/void-builder).
 
 ## Pull Request Guidelines
 
@@ -142,23 +142,23 @@ Void's maintainers distribute Void on our website and in releases. Our build pip
 <!--
 # Relevant files
 
-We keep track of all the files we've changed with Void so it's easy to rebase:
+We keep track of all the files we've changed with Trio so it's easy to rebase:
 
 Edit: far too many changes to track... this is old
 
 - README.md
 - CONTRIBUTING.md
-- VOID_USEFUL_LINKS.md
+- TRIO_USEFUL_LINKS.md
 - product.json
 - package.json
 
 - src/vs/workbench/api/common/{extHost.api.impl.ts | extHostApiCommands.ts}
 - src/vs/workbench/workbench.common.main.ts
-- src/vs/workbench/contrib/void/\*
-- extensions/void/\*
+- src/vs/workbench/contrib/void/*
+- extensions/void/*
 
-- .github/\*
-- .vscode/settings/\*
+- .github/*
+- .vscode/settings/*
 - .eslintrc.json
 - build/hygiene.js
 - build/lib/i18n.resources.json

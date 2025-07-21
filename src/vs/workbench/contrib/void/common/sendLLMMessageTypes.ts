@@ -38,6 +38,7 @@ export type AnthropicLLMChatMessage = {
 	role: 'user',
 	content: string | (
 		{ type: 'text'; text: string; } | { type: 'tool_result'; tool_use_id: string; content: string; }
+		| { type: 'image'; source: { type: 'base64'; media_type: string; data: string; } }
 	)[]
 }
 export type OpenAILLMChatMessage = {
@@ -51,6 +52,12 @@ export type OpenAILLMChatMessage = {
 	role: 'tool',
 	content: string;
 	tool_call_id: string;
+} | {
+	role: 'user',
+	content: string | (
+		{ type: 'text'; text: string; }
+		| { type: 'image_url'; image_url: { url: string; detail?: 'low' | 'high' | 'auto'; } }
+	)[];
 }
 
 export type GeminiLLMChatMessage = {
@@ -64,6 +71,7 @@ export type GeminiLLMChatMessage = {
 	parts: (
 		| { text: string; }
 		| { functionResponse: { id: string; name: ToolName, response: { output: string } } }
+		| { inlineData: { mimeType: string; data: string; } }
 	)[];
 }
 
