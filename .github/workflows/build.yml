@@ -1,0 +1,243 @@
+name: Build Trio
+
+on:
+  push:
+    branches: [ main, release/*, github-workflow ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libx11-dev libxkbfile-dev libsecret-1-dev libkrb5-dev
+          npm config set //github.com/:_authToken=${{ github.token }}
+          npm config set //api.github.com/:_authToken=${{ github.token }}
+          npm config set //npm.pkg.github.com/:_authToken=${{ github.token }}
+          npm config set @microsoft:registry https://npm.pkg.github.com
+          npm config set @vscode:registry https://npm.pkg.github.com
+          npm config set fetch-timeout 300000
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm install
+          npm install -g node-gyp
+          npm install -g gulp-cli
+      - name: Build
+        run: |
+          npm run buildreact
+          npm run gulp vscode-linux-x64-min
+      - name: Package
+        run: |
+          mkdir -p .build/linux/client
+          ARCHIVE_PATH=".build/linux/client/trio-linux-x64.tar.gz"
+          tar -czf $ARCHIVE_PATH -C .. VSCode-linux-x64
+      - name: Generate checksum
+        run: |
+          cd .build/linux/client
+          sha256sum trio-linux-x64.tar.gz > trio-linux-x64.tar.gz.sha256
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trio-linux-x64
+          path: |
+            .build/linux/client/trio-linux-x64.tar.gz
+            .build/linux/client/trio-linux-x64.tar.gz.sha256
+  build-linux-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libx11-dev libxkbfile-dev libsecret-1-dev libkrb5-dev
+          npm config set //github.com/:_authToken=${{ github.token }}
+          npm config set //api.github.com/:_authToken=${{ github.token }}
+          npm config set //npm.pkg.github.com/:_authToken=${{ github.token }}
+          npm config set @microsoft:registry https://npm.pkg.github.com
+          npm config set @vscode:registry https://npm.pkg.github.com
+          npm config set fetch-timeout 300000
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm install
+          npm install -g node-gyp
+          npm install -g gulp-cli
+      - name: Build
+        run: |
+          npm run buildreact
+          npm run gulp vscode-linux-arm64-min
+      - name: Package
+        run: |
+          mkdir -p .build/linux/client
+          ARCHIVE_PATH=".build/linux/client/trio-linux-arm64.tar.gz"
+          tar -czf $ARCHIVE_PATH -C .. VSCode-linux-arm64
+      - name: Generate checksum
+        run: |
+          cd .build/linux/client
+          sha256sum trio-linux-arm64.tar.gz > trio-linux-arm64.tar.gz.sha256
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trio-linux-arm64
+          path: |
+            .build/linux/client/trio-linux-arm64.tar.gz
+            .build/linux/client/trio-linux-arm64.tar.gz.sha256
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm config set //github.com/:_authToken=${{ github.token }}
+          npm config set //api.github.com/:_authToken=${{ github.token }}
+          npm config set //npm.pkg.github.com/:_authToken=${{ github.token }}
+          npm config set @microsoft:registry https://npm.pkg.github.com
+          npm config set @vscode:registry https://npm.pkg.github.com
+          npm config set fetch-timeout 300000
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm install
+          npm install -g node-gyp
+          npm install -g gulp-cli
+      - name: Build
+        run: |
+          npm run buildreact
+          npm run gulp vscode-win32-x64-min
+      - name: Package
+        run: |
+          mkdir -p .build/win32-x64
+          Compress-Archive -Path ..\VSCode-win32-x64\* -DestinationPath .build\win32-x64\trio-win32-x64.zip
+        shell: pwsh
+
+      - name: Generate checksum
+        run: |
+          cd .build/win32-x64
+          $hash = Get-FileHash -Algorithm SHA256 trio-win32-x64.zip
+          $hash.Hash | Out-File -Encoding ascii trio-win32-x64.zip.sha256
+        shell: pwsh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trio-win32-x64
+          path: |
+            .build/win32-x64/trio-win32-x64.zip
+            .build/win32-x64/trio-win32-x64.zip.sha256
+  build-windows-arm64:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm config set //github.com/:_authToken=${{ github.token }}
+          npm config set //api.github.com/:_authToken=${{ github.token }}
+          npm config set //npm.pkg.github.com/:_authToken=${{ github.token }}
+          npm config set @microsoft:registry https://npm.pkg.github.com
+          npm config set @vscode:registry https://npm.pkg.github.com
+          npm config set fetch-timeout 300000
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm install
+          npm install -g node-gyp
+          npm install -g gulp-cli
+      - name: Build
+        run: |
+          npm run buildreact
+          npm run gulp vscode-win32-arm64-min
+      - name: Package
+        run: |
+          mkdir -p .build/win32-arm64
+          Compress-Archive -Path ..\VSCode-win32-arm64\* -DestinationPath .build\win32-arm64\trio-win32-arm64.zip
+        shell: pwsh
+
+      - name: Generate checksum
+        run: |
+          cd .build/win32-arm64
+          $hash = Get-FileHash -Algorithm SHA256 trio-win32-arm64.zip
+          $hash.Hash | Out-File -Encoding ascii trio-win32-arm64.zip.sha256
+        shell: pwsh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trio-win32-arm64
+          path: |
+            .build/win32-arm64/trio-win32-arm64.zip
+            .build/win32-arm64/trio-win32-arm64.zip.sha256
+      - name: Build Windows Installer (x64)
+        run: npm run gulp vscode-win32-x64-system-setup
+        shell: pwsh
+      - name: Upload Windows Installer (x64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: trio-win32-x64-installer
+          path: .build/win32-x64/system-setup/*.exe
+      - name: Build Windows Installer (arm64)
+        run: npm run gulp vscode-win32-arm64-system-setup
+        shell: pwsh
+      - name: Upload Windows Installer (arm64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: trio-win32-arm64-installer
+          path: .build/win32-arm64/system-setup/*.exe
+      - name: Prepare .deb package (x64)
+        run: npm run gulp vscode-linux-x64-prepare-deb
+      - name: Build .deb package (x64)
+        run: npm run gulp vscode-linux-x64-build-deb
+      - name: Upload .deb package (x64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: trio-linux-x64-deb
+          path: .build/linux/deb/amd64/deb/*.deb
+      - name: Prepare .rpm package (x64)
+        run: npm run gulp vscode-linux-x64-prepare-rpm
+      - name: Build .rpm package (x64)
+        run: npm run gulp vscode-linux-x64-build-rpm
+      - name: Upload .rpm package (x64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: trio-linux-x64-rpm
+          path: .build/linux/rpm/x86_64/*.rpm
+      - name: Build AppImage (x64)
+        run: bash scripts/appimage/create_appimage.sh
+      - name: Upload AppImage (x64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: trio-linux-x64-appimage
+          path: Void-x86_64.AppImage
